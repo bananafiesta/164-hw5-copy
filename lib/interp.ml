@@ -8,6 +8,8 @@ type value
   | Bool of bool
   | Pair of (value * value)
   | Str of string
+  | Outchannel of out_channel
+  | Inchannel of in_channel
 
 type environment =
   value Symtab.symtab
@@ -23,6 +25,8 @@ let top_env : unit -> environment =
     Symtab.empty
       |> Symtab.add "true" (Bool true)
       |> Symtab.add "false" (Bool false)
+      |> Symtab.add "stdin" (Inchannel !input_channel)
+      |> Symtab.add "stdout" (Outchannel !output_channel)
 
 (** [display_value v] returns a string representation of the runtime value
     [v]. *)
@@ -40,6 +44,9 @@ let rec display_value : value -> string =
 
       | Str s ->
           "\"" ^ (String.escaped s) ^ "\""
+    
+      | _ ->
+          ""
     end
 
 (** [interp_0ary_primitive prim] tries to evaluate the primitive operation
