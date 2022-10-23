@@ -1,5 +1,5 @@
 (print "abc"), "abc"
 (print "hi\nhello"), "hi\nhello"
 (print "this is a double quote: \". Got it?"), "this is a double quote: \". Got it?"
-(stdin)
-(stdout)
+(print stdin), <in_channel>
+(print stdout), <out_channel>
