@@ -84,6 +84,8 @@ extern uint64_t lisp_entry(void *heap);
 #define heap_mask 0b111
 #define pair_tag 0b010
 
+#define string_tag 0b011
+
 void print_value(uint64_t value) {
   if ((value & num_mask) == num_tag) {
     int64_t ivalue = (int64_t)value;
@@ -103,6 +105,23 @@ void print_value(uint64_t value) {
     printf(" ");
     print_value(v2);
     printf(")");
+  } else if ((value & heap_mask) == string_tag){
+    char* addr = (char*) ((value >> 3) << 3);
+    printf("\"");
+    int i = 0;
+    while (addr[i]  != '\0') {
+      if (addr[i] == '\n') {
+        printf("\\n");
+      } else if (addr[i] == '\"'){
+        printf("\\\"");
+      } else {
+        printf("%c", addr[i]);
+      }
+      // addr += 8;
+      i++;
+    }
+    printf("\"");
+
   } else {
     printf("BAD VALUE: %" PRIu64, value);
   }

@@ -18,6 +18,8 @@ let bool_tag = 0b0011111
 let heap_mask = 0b111
 let pair_tag = 0b010
 
+let string_tag = 0b011
+
 (** [operand_of_num x] returns the runtime representation of the number [x] as
     an operand for instructions *)
 let operand_of_num : int -> operand =
@@ -223,6 +225,21 @@ let rec compile_expr : symtab -> int -> s_exp -> directive list =
     begin match e with
       | Num x ->
           [Mov (Reg Rax, operand_of_num x)]
+
+      | Str s ->
+          let continue_label = gensym "continue" in
+          let string_label = gensym "string" in
+          [LeaLabel(Reg Rax, string_label)]
+          @ [Or (Reg Rax, Imm string_tag)]
+          @ [Jmp continue_label]
+          @ [Align 8]
+          @ [Label string_label]
+          @ [DqString s]
+          @ [Label continue_label]
+          (* @ [LeaLabel (Reg Rax, string_label)] *)
+          
+
+
 
       | Sym "true" ->
           [Mov (Reg Rax, operand_of_bool true)]

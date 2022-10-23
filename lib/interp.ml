@@ -7,6 +7,7 @@ type value
   = Num of int
   | Bool of bool
   | Pair of (value * value)
+  | Str of string
 
 type environment =
   value Symtab.symtab
@@ -36,6 +37,9 @@ let rec display_value : value -> string =
 
       | Pair (v1, v2) ->
           sprintf "(pair %s %s)" (display_value v1) (display_value v2)
+
+      | Str s ->
+          "\"" ^ (String.escaped s) ^ "\""
     end
 
 (** [interp_0ary_primitive prim] tries to evaluate the primitive operation
@@ -150,6 +154,9 @@ let rec interp_expr : environment -> s_exp -> value =
     begin match e with
       | Num x ->
           Num x
+
+      | Str s ->
+          Str s
 
       | Sym var ->
           begin match Symtab.find_opt var env with
