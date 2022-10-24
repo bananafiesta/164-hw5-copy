@@ -10,7 +10,7 @@
 (print (let ((x (open-out "test.txt"))) (do (output x "hello there \n \" this is a test") (close-out x)))), true
 (print (open-in "test.txt")), <in-channel>
 (print (close-in (open-in "test.txt"))), true
-(print (input (open-in "test.txt") 30)), "hello there \n \" this is a test"
+(print (let ((x (open-out "test.txt"))) (do (output x "hello there \n \" this is a test") (close-out x) (input (open-in "test.txt") 30)))), "hello there \n \" this is a test"
 (print (input (open-in "test.txt") 0)), ""
 (open-in 5), error
 (open-out (num? 5)), error
@@ -22,3 +22,5 @@
 (output 5 "hi"), error
 (output (open-out "testout.txt") (zero? 7)), error
 (close-in (open-out "asdf.txt")), error
+(output stdout "asdf")
+(output stdout (input stdin 5)), abcde, abcde

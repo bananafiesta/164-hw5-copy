@@ -272,15 +272,16 @@ let compile_binary_primitive : int -> s_exp -> string -> directive list =
           ]
 
       | "input" ->
-          [Mov (Reg R8, stack_address stack_index)]
-          @ ensure_num (Reg Rax) e
+          (* move inchannel to r8 *)
+          
+          ensure_num (Reg Rax) e
+          @ [Mov (Reg R8, stack_address stack_index)]
           @ ensure_inchannel (Reg R8) e
           @ [Mov (Reg R8, stack_address stack_index)]
           @ [Cmp (Reg Rax, Imm 0)]
           @ [Jl "lisp_error"]
 
-          
-          
+      
           (* move heap pointer to arg2 *)
           @ [Mov (Reg Rsi, Reg Rdi)]
 
@@ -292,7 +293,7 @@ let compile_binary_primitive : int -> s_exp -> string -> directive list =
           @ [Shr (Reg Rdi, Imm channel_shift)]
           (* move n to arg3 *)
           @ [Mov (Reg Rdx, Reg Rax)]
-          @ [Shr (Reg Rax, Imm num_shift)]
+          @ [Shr (Reg Rdx, Imm num_shift)]
 
 
           @ [Call "read_all"]
@@ -417,6 +418,7 @@ let rec compile_expr : symtab -> int -> s_exp -> directive list =
 
       | e ->
           raise (Error.Stuck e)
+          (* (raise (Error.Stuck (Lst [Sym "hi"]))) *)
     end
 
 (** [compile e] produces x86-64 instructions, including frontmatter, for the

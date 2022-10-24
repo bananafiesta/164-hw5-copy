@@ -18,6 +18,8 @@ int read_all(int fd, char *buf, int n) {
       printf("Read error\n");
       exit(1);
     } else if (read_this_time == 0) {
+      // printf("num to read: %d\n", n);
+      // printf("read so far: %d\n", total_read);
       printf("Unexpected EOF\n");
       exit(1);
     }
