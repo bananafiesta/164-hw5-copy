@@ -20,6 +20,11 @@ let pair_tag = 0b010
 
 let string_tag = 0b011
 
+let channel_mask = 0b111111111
+let in_channel_tag = 0b011111111
+let out_channel_tag = 0b001111111
+let channel_shift = 9
+
 (** [operand_of_num x] returns the runtime representation of the number [x] as
     an operand for instructions *)
 let operand_of_num : int -> operand =
@@ -77,6 +82,15 @@ let ensure_num : operand -> s_exp -> directive list =
 
 let ensure_pair : operand -> s_exp -> directive list =
   ensure_type heap_mask pair_tag
+
+let ensure_string : operand -> s_exp -> directive list =
+  ensure_type heap_mask string_tag
+
+let ensure_inchannel : operand -> s_exp -> directive list =
+  ensure_type channel_mask in_channel_tag
+
+let ensure_outchannel : operand -> s_exp -> directive list =
+  ensure_type channel_mask out_channel_tag
 
 let align_stack_index : int -> int =
   fun stack_index ->
@@ -161,6 +175,56 @@ let compile_unary_primitive : int -> s_exp -> string -> directive list =
           ; Mov (Reg Rdi, stack_address stack_index)
           ; Mov (Reg Rax, operand_of_bool true)
           ]
+      
+      | "open-in" ->
+          ensure_string (Reg Rax) e
+            @ [Mov (stack_address stack_index, Reg Rdi)]
+            @ [Add (Reg Rsp, Imm (align_stack_index stack_index))]
+            @ [Mov (Reg Rdi, Reg Rax)]
+            @ [Sub (Reg Rdi, Imm string_tag)]
+            @ [Call "open_for_reading"]
+            @ [Sub (Reg Rsp, Imm (align_stack_index stack_index))]
+            @ [Mov (Reg Rdi, stack_address stack_index)]
+            @ [Shl (Reg Rax, Imm channel_shift)]
+            @ [Or (Reg Rax, Imm in_channel_tag)]
+
+      | "open-out" ->
+          ensure_string (Reg Rax) e
+            @ [Mov (stack_address stack_index, Reg Rdi)]
+            @ [Add (Reg Rsp, Imm (align_stack_index stack_index))]
+            @ [Mov (Reg Rdi, Reg Rax)]
+            @ [Sub (Reg Rdi, Imm string_tag)]
+            (* @ [Sar (Reg Rdi, Imm 3)]
+            @ [Shl (Reg Rdi, Imm 3)] *)
+            @ [Call "open_for_writing"]
+            @ [Sub (Reg Rsp, Imm (align_stack_index stack_index))]
+            @ [Mov (Reg Rdi, stack_address stack_index)]
+            @ [Shl (Reg Rax, Imm channel_shift)]
+            @ [Or (Reg Rax, Imm out_channel_tag)]
+
+      | "close-in" ->
+          ensure_inchannel (Reg Rax) e
+            @ [Mov (stack_address stack_index, Reg Rdi)]
+            @ [Add (Reg Rsp, Imm (align_stack_index stack_index))]
+            @ [Mov (Reg Rdi, Reg Rax)]
+            @ [Shr (Reg Rdi, Imm channel_shift)]
+            @ [Call "close_channel"]
+            @ [Sub (Reg Rsp, Imm (align_stack_index stack_index))]
+            @ [Mov (Reg Rdi, stack_address stack_index)]
+            @ [Shl (Reg Rax, Imm bool_shift)]
+            @ [Or (Reg Rax, Imm bool_tag)]
+
+      | "close-out" ->
+          ensure_outchannel (Reg Rax) e
+            @ [Mov (stack_address stack_index, Reg Rdi)]
+            @ [Add (Reg Rsp, Imm (align_stack_index stack_index))]
+            @ [Mov (Reg Rdi, Reg Rax)]
+            @ [Shr (Reg Rdi, Imm channel_shift)]
+            @ [Call "close_channel"]
+            @ [Sub (Reg Rsp, Imm (align_stack_index stack_index))]
+            @ [Mov (Reg Rdi, stack_address stack_index)]
+            @ [Shl (Reg Rax, Imm bool_shift)]
+            @ [Or (Reg Rax, Imm bool_tag)]
 
       | _ ->
           raise (Error.Stuck e)
@@ -207,6 +271,61 @@ let compile_binary_primitive : int -> s_exp -> string -> directive list =
           ; Add (Reg Rdi, Imm 16)
           ]
 
+      | "input" ->
+          [Mov (Reg R8, stack_address stack_index)]
+          @ ensure_num (Reg Rax) e
+          @ ensure_inchannel (Reg R8) e
+          @ [Mov (Reg R8, stack_address stack_index)]
+          @ [Cmp (Reg Rax, Imm 0)]
+          @ [Jl "lisp_error"]
+
+          
+          
+          (* move heap pointer to arg2 *)
+          @ [Mov (Reg Rsi, Reg Rdi)]
+
+          @ [Mov (stack_address stack_index, Reg Rdi)]
+          @ [Add (Reg Rsp, Imm (align_stack_index stack_index))]
+
+          (* move inchannel to arg1 *)
+          @ [Mov (Reg Rdi, Reg R8)]
+          @ [Shr (Reg Rdi, Imm channel_shift)]
+          (* move n to arg3 *)
+          @ [Mov (Reg Rdx, Reg Rax)]
+          @ [Shr (Reg Rax, Imm num_shift)]
+
+
+          @ [Call "read_all"]
+          @ [Sub (Reg Rsp, Imm (align_stack_index stack_index))]
+          @ [Mov (Reg Rdi, stack_address stack_index)]
+          (* move bytes offset of heap to r8 *)
+          @ [Mov (Reg R8, Reg Rax)]
+          @ [Mov (Reg Rax, Reg Rdi)]
+          @ [Or (Reg Rax, Imm string_tag)]
+          @ [Add (Reg Rdi, Reg R8)]
+
+      | "output" -> 
+          (* move ch to r8 *)
+          [Mov (Reg R8, stack_address stack_index)]
+          @ ensure_outchannel (Reg R8) e
+          @ ensure_string (Reg Rax) e
+          @ [Mov (Reg R8, stack_address stack_index)]
+          @ [Mov (stack_address stack_index, Reg Rdi)]
+          @ [Add (Reg Rsp, Imm (align_stack_index stack_index))]
+
+          (* move ch/fd to arg1 *)
+          @ [Mov (Reg Rdi, Reg R8)]
+          @ [Shr (Reg Rdi, Imm channel_shift)]
+
+          (* move buf to arg2 *)
+          @ [Mov (Reg Rsi, Reg Rax)]
+          @ [Sub (Reg Rsi, Imm string_tag)]
+
+          @ [Call "write_all"]
+          @ [Sub (Reg Rsp, Imm (align_stack_index stack_index))]
+          @ [Mov (Reg Rdi, stack_address stack_index)]
+          @ [Mov (Reg Rax, operand_of_bool true)]
+
       | _ ->
           raise (Error.Stuck e)
     end
@@ -238,7 +357,15 @@ let rec compile_expr : symtab -> int -> s_exp -> directive list =
           @ [Label continue_label]
           (* @ [LeaLabel (Reg Rax, string_label)] *)
           
+      | Sym "stdin" ->
+          [Mov (Reg Rax, Imm 0)]
+          @ [Shl (Reg Rax, Imm channel_shift)]
+          @ [Or (Reg Rax, Imm in_channel_tag)]
 
+      | Sym "stdout" ->
+          [Mov (Reg Rax, Imm 1)]
+          @ [Shl (Reg Rax, Imm channel_shift)]
+          @ [Or (Reg Rax, Imm out_channel_tag)]
 
 
       | Sym "true" ->
@@ -300,6 +427,11 @@ let compile e =
   ; Extern "read_num"
   ; Extern "print_value"
   ; Extern "print_newline"
+  ; Extern "read_all"
+  ; Extern "write_all"
+  ; Extern "open_for_reading"
+  ; Extern "open_for_writing"
+  ; Extern "close_channel"
   ; Section "text"
   ; Label "lisp_entry" ]
   @ compile_expr Symtab.empty (-8) e

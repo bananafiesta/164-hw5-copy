@@ -45,8 +45,11 @@ let rec display_value : value -> string =
       | Str s ->
           "\"" ^ (String.escaped s) ^ "\""
     
-      | _ ->
-          ""
+      | Inchannel _ -> 
+          "<in-channel>"
+    
+      | Outchannel _ ->
+          "<out-channel>"
     end
 
 (** [interp_0ary_primitive prim] tries to evaluate the primitive operation
@@ -112,6 +115,20 @@ let interp_unary_primitive : string -> value -> value option =
         v |> display_value |> output_string !output_channel;
         Some (Bool true)
 
+    | ("open-in", Str filename) ->
+        Some (Inchannel (open_in filename))
+
+    | ("open-out", Str filename) ->
+        Some (Outchannel (open_out filename))
+    
+    | ("close-in", Inchannel i) ->
+        let _ = close_in i in
+        Some (Bool true)
+
+    | ("close-out", Outchannel o) ->
+        let _ = close_out o in
+        Some (Bool true)
+
     | _ ->
         None
   end
@@ -137,6 +154,16 @@ let interp_binary_primitive : string -> value -> value -> value option =
 
       | ("pair", v1, v2) ->
           Some (Pair (v1, v2))
+
+      | ("input", Inchannel ch, Num n) ->
+          if (n < 0) then None else
+          let buf = Bytes.make (n) '\000' in
+          let _ = really_input ch buf 0 n in
+          Some (Str (Bytes.to_string buf))
+
+      | ("output", Outchannel ch, Str s) ->
+          let _ = output_string ch s in 
+          Some (Bool true)
 
       | _ ->
           None

@@ -10,7 +10,7 @@
  * error and exits if there is a problem with a read (for instance, if the file
  * descriptor isn't open for reading).
  */
-void read_all(int fd, char *buf, int n) {
+int read_all(int fd, char *buf, int n) {
   int total_read = 0;
   while (total_read < n) {
     int read_this_time = read(fd, buf + total_read, n - total_read);
@@ -24,6 +24,12 @@ void read_all(int fd, char *buf, int n) {
     total_read += read_this_time;
   }
   buf[n] = '\0';
+  total_read++;
+  if (total_read % 8 == 0) {
+    return total_read;
+  } else {
+    return total_read + 8 - (total_read % 8);
+  }
 }
 
 /* [write_all(fd, buf)] writes the null_terminated string [buf] to the file
@@ -31,6 +37,7 @@ void read_all(int fd, char *buf, int n) {
  * write (for instance, if the file descriptor isn't open for writing).
  */
 void write_all(int fd, char *buf) {
+  // printf("%d\n", fd);
   int total = strlen(buf);
   int total_written = 0;
   while (total_written < total) {
@@ -67,7 +74,17 @@ int open_for_writing(char *filename) {
     printf("Open error\n");
     exit(1);
   }
+  // printf("%d\n", fd);
   return fd;
+}
+
+int close_channel(int fd) {
+  int success = close(fd);
+  if (success < 0) {
+    printf("Close error\n");
+    exit(1);
+  }
+  return 1;
 }
 
 
@@ -85,6 +102,10 @@ extern uint64_t lisp_entry(void *heap);
 #define pair_tag 0b010
 
 #define string_tag 0b011
+#define channel_shift 9
+#define channel_mask 0b111111111
+#define in_channel_tag 0b011111111
+#define out_channel_tag 0b001111111
 
 void print_value(uint64_t value) {
   if ((value & num_mask) == num_tag) {
@@ -121,7 +142,10 @@ void print_value(uint64_t value) {
       i++;
     }
     printf("\"");
-
+  } else if ((value & channel_mask) == in_channel_tag) {
+    printf("<in-channel>");
+  } else if ((value & channel_mask) == out_channel_tag) {
+    printf("<out-channel>");
   } else {
     printf("BAD VALUE: %" PRIu64, value);
   }
